@@ -29,8 +29,16 @@ import {
   worker,
 } from 'detox/internals';
 
-async function internalsTest() {
-  const globalOptions: DetoxInternals.DetoxInitOptions = {
+declare var anyOf: AnyOf; // for testing purposes
+interface AnyOf {
+  <A>(a: A): A;
+  <A, B>(a: A, b: B): A | B;
+  <A, B, C>(a: A, b: B, c: C): A | B | C;
+  <A, B, C, D>(a: A, b: B, c: C, d: D): A | B | C | D;
+}
+
+function getInitOptions(): DetoxInternals.DetoxInitOptions {
+  return {
     cwd: __dirname,
     argv: {
       configuration: 'android.debug',
@@ -39,12 +47,202 @@ async function internalsTest() {
       bail: true
     },
     override: {
-      artifacts: {},
-      devices: {},
+      extends: '@my-org/detox-preset/prod-e2e',
+      testRunner: {
+        args: {
+          $0: 'nyc jest',
+          config: 'e2e/config.js',
+          debug: true,
+          testTimeout: 50000,
+          _: ['e2e/*.test.js'],
+        },
+        forwardEnv: false,
+        retries: 1,
+        inspectBrk: (config) => {
+          if (config.args) {
+            config.args.$0 = 'jest';
+          }
+        },
+      },
+      behavior: {
+        init: {
+          reinstallApp: true,
+          exposeGlobals: true,
+          keepLockFile: true,
+        },
+        launchApp: 'auto',
+        cleanup: {
+          shutdownDevice: false,
+        },
+      },
+      artifacts: {
+        rootDir: 'artifacts',
+        pathBuilder: 'e2e/pathbuilder.js',
+        plugins: {
+          log: {
+            enabled: true,
+            keepOnlyFailedTestsArtifacts: false,
+          },
+          screenshot: {
+            enabled: true,
+            keepOnlyFailedTestsArtifacts: false,
+            shouldTakeAutomaticSnapshots: true,
+            takeWhen: {
+              testStart: false,
+              testFailure: true,
+              testDone: false,
+              appNotReady: true,
+            },
+          },
+          video: {
+            enabled: true,
+            keepOnlyFailedTestsArtifacts: false,
+          },
+          instruments: {
+            enabled: true,
+          },
+          timeline: {
+            enabled: true,
+          },
+          uiHierarchy: {
+            enabled: true,
+          },
+        },
+      },
+      devices: {
+        ios: {
+          type: 'ios.simulator',
+          device: {
+            name: 'iPhone 12-Detox',
+            os: 'iOS 100.500',
+          },
+        },
+        android: {
+          type: 'android.emulator',
+          device: {
+            avdName: 'Pixel_200',
+          },
+          utilBinaryPaths: ['testButler.apk'],
+        },
+      },
+      apps: {
+        ios: {
+          type: 'ios.app',
+          bundleId: 'com.example',
+          binaryPath: 'path/to/app',
+          build: 'echo IOS',
+          launchArgs: {
+            some: 1,
+            arg: '2',
+            obj: {},
+          },
+        },
+        android: {
+          type: 'android.apk',
+          bundleId: 'com.example',
+          binaryPath: 'path/to/app',
+          testBinaryPath: 'path/to/test-app',
+          build: 'echo IOS',
+          launchArgs: {
+            some: 1,
+            arg: '2',
+            obj: {},
+          },
+        },
+      },
+      configurations: {
+        'ios.sim.debug': {
+          device: {
+            type: 'ios.simulator',
+            device: 'iPhone 12 Pro Max'
+          },
+          app: {
+            type: 'ios.app',
+            binaryPath: 'ios/build/Build/Products/Debug-iphonesimulator/example.app',
+            build: 'some build command',
+          },
+        },
+        'ios.sim.release': {
+          device: {
+            type: 'ios.simulator',
+            device: anyOf({ id: 'GUID-GUID-GUID-GUID' }, { type: 'iPad Mini' }, { name: 'iPad Mini-Detox' }, { os: 'iOS 9.3.6' }),
+          },
+          apps: [],
+        },
+        'android.attached': {
+          device: {
+            type: 'android.attached',
+            device: {
+              adbName: 'emulator-5554',
+            },
+          },
+          app: {
+            type: 'android.apk',
+            binaryPath: 'android/app/build/outputs/apk/fromBin/release/app-fromBin-release.apk',
+            build: 'some command',
+          },
+        },
+        'android.genycloud.uuid': {
+          device: {
+            type: 'android.genycloud',
+            device: {
+              recipeUUID: 'a50a71d6-da90-4c67-bdfa-5b602b0bbd15',
+            },
+          },
+          apps: [],
+        },
+        'android.genycloud.release2': {
+          device: {
+            type: 'android.genycloud',
+            device: {
+              recipeName: 'Detox_Pixel_API_29',
+            },
+          },
+          apps: [],
+        },
+        stub: {
+          device: {
+            type: './integration/stub',
+            name: 'integration-stub',
+            integ: 'stub',
+          },
+          apps: [],
+        },
+        'aliased.ios': {
+          device: 'ios',
+          app: 'ios',
+          session: {
+            debugSynchronization: 0,
+          },
+          artifacts: {
+            plugins: {
+              log: anyOf('none', 'failing', 'all'),
+              screenshot: anyOf('none', 'manual', 'failing', 'all'),
+              video: anyOf('none', 'failing', 'all'),
+              instruments: anyOf('none', 'all'),
+              timeline: anyOf('none', 'all'),
+              uiHierarchy: anyOf('disabled', 'enabled'),
+            },
+          },
+        },
+        'aliased.android': {
+          device: 'android',
+          app: 'android',
+          artifacts: {
+            plugins: {
+              log: 'all',
+            },
+          },
+        },
+      },
     },
     global,
     workerId: Math.random() > 0.5 ? null : 'worker-1',
   };
+}
+
+async function internalsTest() {
+  const globalOptions = getInitOptions();
 
   await resolveConfig();
   await resolveConfig({});
