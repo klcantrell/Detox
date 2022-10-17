@@ -2,7 +2,6 @@ const { log } = require('../internals');
 const DeviceRegistry = require('../src/devices/DeviceRegistry');
 const { getDetoxLibraryRootPath } = require('../src/utils/environment');
 
-
 module.exports.command = 'reset-lock-file';
 module.exports.desc = 'Resets all Detox lock files. Useful when you need to run multiple `detox test` commands in parallel with --keepLockFile.';
 
