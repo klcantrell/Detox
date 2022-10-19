@@ -1,7 +1,5 @@
 @startuml
 
-title "detox test → jest --maxWorkers N"
-
 actor User
 boundary "Detox CLI" as CLI
 participant "DetoxPrimaryContext" as Pri

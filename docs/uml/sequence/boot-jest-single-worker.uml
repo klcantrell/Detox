@@ -1,7 +1,5 @@
 @startuml
 
-title "DETOX_CONFIGURATION=... jest --runInBand"
-
 actor User
 boundary "Jest (main)" as Jest0
 participant "DetoxPrimaryContext" as Pri

@@ -1,0 +1,229 @@
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+import LifecycleManyWorkersCLI from './partials/_lifecycle-cli-many-workers.md';
+import LifecycleManyWorkersJest from './partials/_lifecycle-jest-many-workers.md';
+import LifecycleSingleWorkerCLI from './partials/_lifecycle-cli-single-worker.md';
+import LifecycleSingleWorkerJest from './partials/_lifecycle-jest-single-worker.md';
+
+# Internals API
+
+:::caution
+
+This section might be more volatile than the other ones, yet we'll do our
+best to adhere to Semantic Release standards even here.
+
+:::
+
+Detox Internals might be useful for developing advanced enterprise presets
+or if you are planning to integrate with a third-party test runner like
+[Mocha], [Ava], [Vitest] or other ones.
+
+## Lifecycle
+
+It is a good idea to illustrate it using our own integration with Jest test runner, but before we start, let's see how Jest works overall:
+
+### Jest lifecycle
+
+![UML sequence diagram](../img/uml/jest-diagram.svg)
+
+1. Jest's main process starts from resolving and evaluating its config file, e.g. `jest.config.js`:
+  ```js
+  module.exports = async function () {
+    return {
+      globalSetup: '/path/to/globalSetup.js',
+      globalTeardown: '/path/to/globalTeardown.js',
+      reporters: ['/path/to/reporter.js'],
+      /* ... jest config ... */
+    };
+  };
+  ```
+1. If `globalSetup` handler is defined, it is resolved and executed in the main process:
+  ```js
+  module.exports = async function () {
+    // ... global setup code ...
+  };
+  ```
+1. The next come reporters, one of the most long-living entities in the test session. After instantiating reporters, Jest calls their `onRunStart` method:
+  ```js
+  class Reporter {
+    async onRunStart(aggregatedResults, options) {
+      // ... reporter code ...
+    }
+
+    // ...
+  };
+  ```
+1. If Jest is not running in band (`--runInBand`) and it has _N_ workers (_N > 1_), then it spawns _N_ child processes that keep taking test files one after another, running their tests inside and reporting back to the reporters:
+  ```js
+  class Reporter {
+    async onTestFileResult(test, testResult, aggregatedResult) {
+      // ... reporter code ...
+    }
+
+    // ...
+  };
+  ```
+  Otherwise, Jest runs the tests in the main process without spawning any other processes. The reporting flow remains the same.
+1. After all the tests have been executed, Jest calls `onRunComplete` in the reporters. This is the last time when a reporter can take an execution flow:
+  ```js
+  class Reporter {
+    async onRunComplete(testContexts, results) {
+      // ... reporter code ...
+    }
+
+    // ...
+  };
+  ```
+1. The last checkpoint controlled by a user is the global teardown. If `globalTeardown` handler is defined, it is resolved and executed in the main process:
+  ```js
+  module.exports = async function () {
+    // ... global teardown code ...
+  };
+  ```
+
+### Detox lifecycle
+
+Ideally, any test runner integration should provide Detox CLI with information about failed test files.
+This information enables the [retry mechanism](../config/testRunner#testrunnerretries-number), built into Detox CLI, which can retry specific failed test files a few times, e.g. to tackle occasional flakiness on CI.
+
+This means that Detox context should live longer than a test runner, and the test runner should have means to report back to Detox CLI, whereas the child process hierarchy is multi-tiered:
+
+```plain text
+└── detox test ...
+    └── jest ... --maxWorkers N
+        ├── jest-worker 1
+        ├── ...
+        └── jest-worker N
+```
+
+Even if Jest runs directly, without Detox CLI, there's still a one-to-many relationship between processes:
+
+```plain text
+└── jest ... --maxWorkers N
+    ├── jest-worker 1
+    ├── ...
+    └── jest-worker N
+```
+
+If we want to be on the safe side, every process should be able to communicate with the root process, where we have the primary context of Detox, and vice versa.
+Retrying failed tests is just one of numerous needs, and there are more:
+
+* the primary context (and workers themselves, at times) needs to know how many workers are there;
+* the workers should request from the primary context to allocate a device and return it back when they are done;
+* any secondary context should be able to tell whether this is a first time it is running, or it is an Nth attempt;
+
+The list can be continued and might expand even more with time, but the point is that Detox will get instantiated as many times as child processes are created during the test session, and every time it should be trivial to synchronize the primary and the secondary contexts to keep the seamless experience.
+
+It is worth mentioning that Jest's main process is ill-suited for taking a device and running the tests, as its purpose is to orchestrate the entire test session and not run the tests themselves. This means that not all secondary contexts of Detox are "born equal" – some will be allocating a device for running tests, but some will be merely communicating with the primary context. This is why we extract an auxiliary method from [`init()`][init], which is called [`installWorker()`][installWorker],
+and make it possible to [`init({ workerId: null })`][init] and avoid creating a worker.
+
+<Tabs>
+  <TabItem value="detox test … --maxWorkers N">
+    <LifecycleManyWorkersCLI />
+  </TabItem>
+  <TabItem value="jest … --maxWorkers N">
+    <LifecycleManyWorkersJest />
+  </TabItem>
+  <TabItem value="detox test … --runInBand">
+    <LifecycleSingleWorkerCLI />
+  </TabItem>
+  <TabItem value="jest … --runInBand">
+    <LifecycleSingleWorkerJest />
+  </TabItem>
+</Tabs>
+
+## Methods
+
+### `resolveConfig([options])` \[Promise]
+
+Use with a caution, when you still have no config, yet need to avoid [init()][init] call.
+
+You normally don’t need it if you use Detox CLI (`detox test …`), but if you want to start tests
+directly and you need to have the config resolved before [init()][init] is called, this
+is the way to go.
+
+### `getStatus()` \[enum]
+
+Returns a string (`inactive`, `init`, `active` or `cleanup`) depending on what’s going on.
+
+### `init([options])` \[Promise]
+
+This is the phase where Detox reads its configuration, starts a server.
+
+### `installWorker([options])` \[Promise]
+
+This is the phase where Detox loads its expectation library and starts a device.
+
+### `uninstallWorker()` \[Promise]
+
+Deallocates the device.
+
+### `cleanup()` \[Promise]
+
+The global cleanup phase should happen after all the tests have finished.
+This is the phase where the Detox server shuts down.
+
+## Optional lifecycle
+
+### Synchronizing with artifacts manager
+
+The naming you can see adheres much to Jest Circus workflow:
+
+- `onRunStart`
+- `onRunDescribeStart`
+- `onTestStart`
+- `onHookStart`
+- `onHookFailure`
+- `onHookSuccess`
+- `onTestFnStart`
+- `onTestFnFailure`
+- `onTestFnSuccess`
+- `onTestDone`
+- `onRunDescribeFinish`
+- `onRunFinish`
+
+### Reporting test results
+
+`reportTestResults` reports to Detox CLI about failed tests that could
+have been re-run if `--retries` is set to a non-zero.
+
+It takes one argument, an array of test file reports. Each report is an object with the following properties:
+
+- `testFilePath` (string) — global or relative path to the failed test file;
+- `success` (boolean) — whether the test passed or not;
+- `testExecError` (optional error) — top-level error if the entire test file failed;
+- `isPermanentFailure` (optional boolean) — if the test failed, it should tell whether the failure is permanent. Permanent failure means that the test file should not be re-run.
+
+## Properties
+
+### config
+
+### session
+
+### log
+
+### `tracing`
+
+`tracing.createEventStream()` – creates a readable stream of the currently recorded events in
+[Chrome Trace Event format](https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU).
+
+See also: [`DurationBeginEvent`], [`DurationEndEvent`], [`InstantEvent`].
+
+### worker
+
+Not documented on purpose. Provides the direct access to the object which
+holds the device driver, websocket client, matchers, expectations, etc.
+
+[Mocha]: https://mochajs.org
+[Ava]: https://github.com/avajs/ava
+[Vitest]: https://vitest.dev
+[`DurationBeginEvent`]: https://wix-incubator.github.io/trace-event-lib/interfaces/DurationBeginEvent.html
+[`DurationEndEvent`]: https://wix-incubator.github.io/trace-event-lib/interfaces/DurationEndEvent.html
+[`InstantEvent`]: https://wix-incubator.github.io/trace-event-lib/interfaces/InstantEvent.html
+[resolveConfig]: #resolveconfigoptions-promise
+[getStatus]: #getstatus-enum
+[init]: #initoptions-promise
+[installWorker]: #installworkeroptions-promise
+[uninstallworker]: #uninstallworker-promise
+[cleanup]: #cleanup-promise
