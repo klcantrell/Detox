@@ -4,6 +4,8 @@ authors:
 tags: [major-release, genymotion]
 ---
 
+# Detox 20 is out
+
 :::caution
 
 This is a draft post about a future release.
@@ -11,36 +13,208 @@ Congrats if you found it earlier than we announced it.
 
 :::
 
-# Detox 20 is out
-
-Today we're proud to announce the new major release, **Detox 20.**
-The main highlights are:
+Today we're proud to announce the new major release, **Detox 20**, which brings:
 
 * improved integration with test runners,
 * official support for Genymotion SaaS,
 * configurable logging subsystem,
-* a few convenience features (`headless` for iOS, `reversePorts` for Android),
+* headless mode for iOS via configs and CLI,
+* reversing TCP ports via Android app configs,
 * and more optimizations to land in the next minor versions.
 
 ## Integration with test runners
 
-TODO: Integration with test runners
+**Highlights**: [`Config file > Test runner`], [`Internals API`], [`Dropping Mocha support`].
+
+It took about a few months of work to formalize the contract between Detox and a test runner. While there's still a lot of place for improvement, the new Detox release refines their interaction and lays the groundwork for third-party integrations.
+
+[Mocha] was our first supported test runner, but unfortunately, it could not keep up with our scaling requirements as the number of end-to-end tests grew. [By the time][Mocha 8] it acquired the ability to run tests in parallel, we already had [to place bets][Jest PR] on another horse, and that was [Jest].
+
+We attempted to keep compatibility with both Jest and Mocha, but the farther we went, the more obvious it was that we couldn't have it both ways. As it turned out, Jest wasn't easy to get along with – our first integration with it was too simplistic. Over a couple of years of use in production, we kept discovering various issues that forced us to rewrite our "glue" code from scratch twice, and this isn't over yet. All that combined didn't leave much time and energy for tinkering with Mocha anymore.
+
+Admittedly, such new features as [test runner config][`Config file > Test runner`] and [Internals API][`Internals API`] came at expense of leaving behind our old Mocha integration, simply due to a shortage of resources. If there's enough demand, now it is up to the open-source community to build a new integration between Detox and Mocha.
 
 ## Genymotion SaaS
 
-TODO: Genymotion SaaS
+Two years ago we [added a basic support][Genymotion PR] for cloud-based Android emulators provided by [Genymotion SaaS] and started a beta testing phase across mobile projects at Wix. After all the rigors of maintaining local emulators on CI build agents, those lightweight cloud devices felt like a breath of fresh air – full GPU acceleration, easy scaling and far less maintenance. For instance, teams with a large test codebase could reduce duration of their CI pipelines almost by half after scaling up from 2 devices to 6 per each build.
+
+This positive impact encouraged us to adopt [Genymotion SaaS] as quickly as possible for all the relevant projects, in spite of system design flaws brought by the initial solution, especially in regard to the global lifecycle management. While those flaws were rather minor, we felt uncertain about releasing it as-is, and decided to take time and gain more production experience before taking any direction.
+
+The further experience was rather smooth and rarely raised new issues, so about half a year ago we set ourselves to the goal to address the global test lifecycle concerns and open up the cloud device capability for the entire Detox community. To date, there are a few minor [glitches](https://github.com/wix/Detox/issues/3573) that might occur in advanced use scenarios, but we'll address them soon as well, likely this year.
+
+Now more than ever, we feel a need to provide our users with more opportunities for testing in the cloud, and this step is only the first of many to come. We hope you'll utilize this new feature to your delight.
 
 ## Configurable logger
 
-TODO: Configurable logger
+**Highlights**: [`Config file > Logger`], [`Logger API`].
+
+The rigidity of the logging subsystem has been weighing on me ever [since I rewrote it][Logger rewrite] in the summer of 2019. Due to time constraints and existing tech debts, it was impossible to do it right the first time, so we lived about three years with rather a proof-of-concept than a full-fledged feature.
+
+The inconvenience wasn't fatal but quite noticeable, nevertheless. Here are a few syndromes you could have spotted if you have ever used Detox timeline and log artifacts, especially when running tests in parallel:
+
+* an uncanny file array: `detox_pid_7505.log`, `detox_pid_7505.log.json`, `detox_pid_7506.log`;
+* a relatively shallow `detox.trace.json`: test suites, test functions, and some user-defined segments.
+
+The good news is that the new Detox release condenses all those numerous logs into two files:
+
+* the plain, human-readable `detox.log`;
+* the raw, machine-readable `detox.trace.json` for [Perfetto], `chrome://trace`, and any other programs.
+
+![A screenshot of timeline view generated by Perfetto](/img/blog/v20-perfetto-example.png)
+
+With the help of the new [Logger API][`Logger API`], you can add custom duration events to the timeline too, e.g.:
+
+```js
+await detox.log.complete('Login', async () => {
+  await element(by.id('email')).typeText('john@example.com');
+  await element(by.id('password')).typeText('123456');
+  await element(by.id('submit')).tap();
+});
+```
+
+Besides, it is possible now to customize the console output of Detox via the new [logger config][`Config file > Logger`], e.g.:
+
+```js title="detox.config.js"
+/** @type {Detox.DetoxConfig} */
+module.exports = {
+  // ...
+  logger: {
+    options: {
+      showDate: false,
+      showLoggerName: false,
+      showPid: false,
+      prefixers: {
+        ph: null,
+      },
+    },
+  },
+};
+```
+
+In this example we minimize all the metadata around the log messages – see the screenshot below:
+
+![Terser logs after applying the override](/img/blog/v20-logger-options.png)
 
 ## Minor features
 
-TODO: Minor features
+### Headless iOS
+
+One of long-standing inconveniences was that Detox has been booting iOS simulators in hidden window mode not only on CI,
+but in local development environment as well. We unified `headless` flag for both iOS and Android, so that both the
+platforms boot a device in a visible way unless you configure it otherwise, e.g.:
+
+```js
+/* @type {Detox.DetoxConfig} */
+module.exports = {
+  devices: {
+    iphone: {
+      type: 'ios.simulator',
+      // highlight-next-line
+      headless: process.env.CI ? true : undefined,
+      device: {
+        type: 'iPhone 14'
+      },
+      /* ... */
+    }
+  },
+};
+```
+
+or, via CLI:
+
+```bash
+detox test -c ios.sim.release --headless
+```
+
+### Reverse ports
+
+Your apps might try to access some `localhost:*` addresses (e.g. mock servers), but this is a bit more problematic in case
+of Android, because Android emulators are separate virtual devices, and they have their own loopback network interface.
+In such cases, you have to set up reverse port forwarding via `adb reverse`.
+
+Since this is a common scenario for apps in debug mode (e.g. React Native bundler on port 8081, Storybook server on 9009, etc.),
+we decided to add an optional config property for Android apps, `reversePorts`:
+
+```js
+/** @type {Detox.DetoxConfig} */
+module.exports = {
+  // ...
+  apps: {
+    'android.debug': {
+      type: 'android.apk',
+      binaryPath: '...',
+      reversePorts: [3000],
+    },
+  },
+};
+```
+
+Basically, this is a convenience API which tells Detox to run `device.reverseTcpPort(portNumber)` after installing the
+app. It should be useful for anyone who prefers keeps such things rather in configs than in the code.
+
+### Re-launching apps
+
+Long time ago we introduced `device.relaunchApp()` method. The method itself is identical to calling
+`device.launchApp({ newInstance: true })`, so at some point we deprecated it... for no good reason. We often see
+people using `device.launchApp(opts)`, optional parameters, only to pass `{ newInstance: true }`, and that made us change our minds.
+
+We added officially the convenience method to the [device API][`Device API > relaunchApp`] docs and [to the typings][typings], so feel free to use it:
+
+```js
+await device.relaunchApp();
+await device.relaunchApp(opts);
+```
+
+### Read-only emulators by default
+
+The `-read-only` flag appeared in [Android emulator 28.0.16](https://developer.android.com/studio/releases/emulator#concurrent-avd), and we adopted it relatively quickly to Detox since it allowed to run multiple instances of a single Android virtual device (AVD) concurrently. Obviously, that helped to implement parallel test execution support for Android back then.
+
+Being overcautious, we implemented that partially, only when user starts multiple concurrent workers, and this, in fact, created a common UX issue. Imagine you run tests in band, using one worker only. By default, that creates you a regular AVD instance, i.e. not a read-only one. After that you switch to multiple workers, and you get an error from Android emulator which complains about mixing regular and read-only instances. While the fix itself is very simple – close the running AVD and try again – this entire overcaution was rather creating issues than solving them.
+
+This is why, from now on, Android emulators will always be starting in `-read-only` mode unless you configure `readonly: false` in your [device config][`Config file > Device`].
+
+### Reset lock file
+
+This release adds a small CLI tool, [`detox reset-lock-file`][reset-lock-file], to help users with one specific use scenario.
+
+Imagine you want to run tests for multiple Detox configurations at once, e.g.:
+
+```bash
+detox test -c iphoneSE2020.release e2e/ui.test.js
+detox test -c iphone14ProMax.release e2e/ui.test.js
+```
+
+The problem is that Detox uses a file locking mechanism to avoid situations when parallel test workers would take control over the same device. Starting `detox test` command resets that file contents, so it creates a risk of race condition.
+
+To eliminate that risk, use combination of `detox reset-lock-file` and `--keepLockFile` like this:
+
+```bash
+detox reset-lock-file & \
+detox test --keepLockFile -c iphoneSE2020.release e2e/ui.test.js & \
+detox test --keepLockFile -c iphone14ProMax.release e2e/ui.test.js & \
+wait
+```
+
+## Deprecations
+
+Detox 20 executes many pending deprecations, so make sure to check out our [Migration Guide] before upgrading:
+
+* JS: minimum supported Node.js version is `14.x`;
+* JS: minimum supported Jest version is `27.2.5`;
+* JS: Mocha test runner is no longer supported;
+* JS: discontinued old adapters for Jest (`jest-jasmine`, first generation of `jest-circus` adapter);
+* JS: discontinued `{ permanent: true }` option in `device.appLaunchArgs.*` methods ([#3360](https://github.com/wix/Detox/pull/3360));
+* Config: discontinued kebab-case properties: `test-runner`, `runner-config` ([#3371](https://github.com/wix/Detox/pull/3371))
+* Config: discontinued `skipLegacyWorkersInjections` property ([(#3286)](https://github.com/wix/Detox/pull/3286))
+* Config: deprecated `specs` and `runnerConfig` properties
+* Config: changed [semantics][`Config file > Test runner`] of `testRunner` property
+* Config: dropped support for all-in-one configurations ([#3386](https://github.com/wix/Detox/pull/3386));
+* Android: remove deprecated native IdlePolicyConfig ([#3332](https://github.com/wix/Detox/pull/3332/files))
+* iOS: discontinued `ios.none` device type ([#3361](https://github.com/wix/Detox/pull/3361))
 
 ## Afterword
 
-Over the last year and a half, we have been establishing a centralized configuration system for more than 50 projects using Detox at Wix. While it never seemed to be a cakewalk, the entire experience of troubleshooting over a hundred issues across the organization did not leave us the same.
+Over the last year and a half, we have been establishing a centralized configuration system for more than 50 projects using Detox at Wix. While it never seemed to be a cakewalk, the entire experience of troubleshooting over a hundred issues across the organization did not leave us unchanged.
 
 We clearly see there are numerous things to improve in Detox, but most of them boil down to the same thing – **scaling**. Surprisingly, "scaling" makes an excellent umbrella term for nearly every challenge we've been encountering lately:
 
@@ -50,4 +224,29 @@ We clearly see there are numerous things to improve in Detox, but most of them b
 
 Our core team has been challenged with human resource constraints and scaling needs for a long time already, and, in many ways, that has shaped a specific mindset within our core team, where every feature is evaluated via asking a simple question: _is it going to save us and other people time to focus on more important things?_ Teaching how to fish is better than giving a fish, and our success at preventing support issues is more valuable than our success at solving them ourselves.
 
-This is why the upcoming releases will be aimed at...
+This is why we'll be making the next efforts in these three areas, with the hope to get back to you soon with even more exciting updates.
+
+Enjoy your drive with Detox 20!
+
+Cheers! :wave:
+
+[`Config file > Test runner`]: /docs/next/config/testRunner
+[`Internals API`]: /docs/next/api/internals
+[`Dropping Mocha support`]: https://github.com/wix/Detox/issues/3193
+[`Config file > Device`]: /docs/next/config/devices
+[`Config file > Logger`]: /docs/next/config/logger
+[`Config file > Test runner`]: /docs/next/config/testRunner
+[`Device API > relaunchApp`]: /docs/next/api/device#devicerelaunchappparams
+[`Logger API`]: /docs/next/api/logger
+[reset-lock-file]: /docs/next/cli/reset-lock-file
+[Jest]: https://jestjs.io
+[Mocha]: https://mochajs.org
+[Mocha 8]: https://github.com/mochajs/mocha/releases/tag/v8.0.0
+[Jest PR]: https://github.com/wix/Detox/pull/609
+[Logger rewrite]: https://github.com/wix/Detox/pull/835
+[Genymotion PR]: https://github.com/wix/Detox/pull/2446
+[Genymotion SaaS]: https://cloud.geny.io
+[Genymotion issues]: https://github.com/wix/Detox/issues/3573
+[Perfetto]: https://ui.perfetto.dev/
+[Migration Guide]: /docs/next/guide/migration#200
+[typings]: https://github.com/wix/Detox/blob/next/detox/index.d.ts
