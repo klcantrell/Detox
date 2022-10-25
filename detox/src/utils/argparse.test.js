@@ -118,4 +118,22 @@ describe('argparse', () => {
       expect(argparse.joinArgs(argsObject, options)).toBe('-version=100 --help');
     });
   });
+
+  describe('getArgvCommand()', () => {
+    let getArgvCommand;
+
+    beforeEach(() => {
+      getArgvCommand = require('./argparse').getArgvCommand;
+    });
+
+    it('should return current process.argv', () => {
+      expect(getArgvCommand()).toContain('jest');
+    });
+
+    it('should transform argv[1] to relative path', () => {
+      jest.spyOn(process, 'cwd').mockReturnValueOnce('/home/user/projects/1');
+
+      expect(getArgvCommand(['node', '/home/user/projects/1/node_modules/.bin/jest', '--no-color'])).toBe('node_modules/.bin/jest --no-color');
+    });
+  });
 });

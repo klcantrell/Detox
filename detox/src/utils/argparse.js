@@ -2,6 +2,7 @@ const _ = require('lodash');
 const argv = require('minimist')(process.argv.slice(2));
 
 const { escape } = require('./pipeCommands');
+const path = require('path');
 
 function getArgValue(key, alias) {
   const value = _getArgvValue(key, alias);
@@ -81,7 +82,12 @@ function joinArgs(keyValues, options = DEFAULT_JOIN_ARGUMENTS_OPTIONS) {
   return argArray.join(' ');
 }
 
+function getArgvCommand(argv = process.argv) {
+  return `${path.relative(process.cwd(), argv[1])} ${argv.slice(2).join(' ')}`;
+}
+
 module.exports = {
+  getArgvCommand,
   getArgValue,
   getEnvValue,
   getFlag,
