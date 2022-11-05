@@ -93,3 +93,23 @@ describe('asError(err)', () => {
     expect(errorUtils.asError(err).message).toBe(err);
   });
 });
+
+describe('serializeObjectWithError(obj, errorKey)', () => {
+  it('should passthrough a non-error object', () => {
+    const obj = { some: 'value' };
+    expect(errorUtils.serializeObjectWithError(obj, 'error')).toBe(obj);
+  });
+
+  it('should serialize an error object', () => {
+    const obj = { some: 'value', error: new Error('error message') };
+
+    const serialized = errorUtils.serializeObjectWithError(obj, 'error');
+    expect(serialized.error).not.toBeInstanceOf(Error);
+
+    const deserialized = errorUtils.deserializeObjectWithError(serialized, 'error');
+    expect(deserialized.error).toBeInstanceOf(Error);
+
+    expect(deserialized.error).toEqual(obj.error);
+    expect(errorUtils.deserializeObjectWithError(obj, 'error')).toBe(obj);
+  });
+});
