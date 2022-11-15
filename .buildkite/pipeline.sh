@@ -1,6 +1,7 @@
 #!/bin/bash -e
 
-echo "agents:\n\tqueue: mbms"
+echo "agents:
+  queue: mbms"
 
 if [[ "$1" == 'start' ]];then
   if [[ $(echo $BUILDKITE_MESSAGE | tr '[:upper:]' '[:lower:]') =~ ^release$ ]];then
