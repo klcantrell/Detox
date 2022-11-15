@@ -1,5 +1,7 @@
 #!/bin/bash -e
 
+echo "agents:\n\tqueue: mbms"
+
 if [[ "$1" == 'start' ]];then
   if [[ $(echo $BUILDKITE_MESSAGE | tr '[:upper:]' '[:lower:]') =~ ^release$ ]];then
     cat .buildkite/pipeline.release.yml
