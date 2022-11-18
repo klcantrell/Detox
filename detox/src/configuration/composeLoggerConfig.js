@@ -24,7 +24,7 @@ function composeLoggerConfig(opts) {
 
   return items.reduce(
     /**
-     * @param {Partial<Detox.DetoxLoggerConfig>} acc
+     * @param {Partial<Detox.DetoxLoggerConfig> & { level: Detox.DetoxLogLevel; }} acc
      * @param config
      */
     (acc, config) => {
