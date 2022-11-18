@@ -1,5 +1,9 @@
 class ArtifactPluginsProvider {
-  declareArtifactPlugins({ client }) {} // eslint-disable-line no-unused-vars
+  /**
+   * @param {object} _config
+   * @param {*} _config.client
+   */
+  declareArtifactPlugins(_config) {}
 }
 
 class AndroidArtifactPluginsProvider extends ArtifactPluginsProvider {

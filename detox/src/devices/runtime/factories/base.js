@@ -7,8 +7,8 @@ class RuntimeDeviceFactory {
     return new RuntimeDevice({ ...commonDeps, ...configs }, runtimeDriver);
   }
 
-  _createDriverDependencies(commonDeps) { } // eslint-disable-line no-unused-vars
-  _createDriver(deviceCookie, deps, configs) {} // eslint-disable-line no-unused-vars
+  _createDriverDependencies(_commonDeps) { }
+  _createDriver(_deviceCookie, _deps, _configs) {}
 }
 
 module.exports = RuntimeDeviceFactory;

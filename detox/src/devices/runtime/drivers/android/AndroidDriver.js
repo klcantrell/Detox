@@ -166,7 +166,7 @@ class AndroidDriver extends DeviceDriverBase {
     await this.uiDevice.pressBack();
   }
 
-  async sendToHome(params) { // eslint-disable-line no-unused-vars
+  async sendToHome(_params) {
     await this.uiDevice.pressHome();
   }
 

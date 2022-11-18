@@ -85,7 +85,7 @@ class TwoSnapshotsPerTestPlugin extends ArtifactPlugin {
    * @protected
    * @abstract
    */
-  async preparePathForSnapshot(testSummary, snapshotName) {} // eslint-disable-line no-unused-vars
+  async preparePathForSnapshot(_testSummary, _snapshotName) {}
 
   /***
    * Creates a handle for a test artifact (video recording, log, etc.)

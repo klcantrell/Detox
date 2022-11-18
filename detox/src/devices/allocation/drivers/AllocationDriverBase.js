@@ -1,4 +1,7 @@
-// @ts-nocheck
+/**
+ * @typedef {object} DeviceCookie
+ */
+
 /**
  * @typedef DeallocOptions
  * @property shutdown { Boolean }
@@ -6,17 +9,17 @@
 
 class AllocationDriverBase {
   /**
-   * @param deviceConfig { Object }
+   * @param {Detox.DetoxDeviceConfig} _deviceConfig
    * @return {Promise<DeviceCookie>}
    */
-  async allocate(deviceConfig) {} // eslint-disable-line no-unused-vars
+  async allocate(_deviceConfig) {}
 
   /**
-   * @param cookie { DeviceCookie }
-   * @param options { DeallocOptions }
+   * @param {DeviceCookie} _cookie
+   * @param {DeallocOptions} _options
    * @return {Promise<void>}
    */
-  async free(cookie, options) {} // eslint-disable-line no-unused-vars
+  async free(_cookie, _options) {}
 }
 
 module.exports = AllocationDriverBase;

@@ -44,13 +44,13 @@ class ArtifactPlugin {
    *
    * @protected
    * @async
-   * @param {Object} event - Launch app event object
-   * @param {string} event.deviceId - Current deviceId
-   * @param {string} event.bundleId - Current bundleId
-   * @param {Object} event.launchArgs - Mutable key-value pairs of args before the launch
+   * @param {Object} _event - Launch app event object
+   * @param {string} _event.deviceId - Current deviceId
+   * @param {string} _event.bundleId - Current bundleId
+   * @param {Object} _event.launchArgs - Mutable key-value pairs of args before the launch
    * @return {Promise<void>} - when done
    */
-  async onBeforeLaunchApp(event) {
+  async onBeforeLaunchApp(_event) {
     Object.assign(this.context, {
       isAppReady: false,
     });
@@ -84,13 +84,13 @@ class ArtifactPlugin {
    *
    * @protected
    * @async
-   * @param {Object} event - App ready event object
-   * @param {string} event.deviceId - Current deviceId
-   * @param {string} event.bundleId - Current bundleId
-   * @param {number} event.pid - Process id of the running app
+   * @param {Object} _event - App ready event object
+   * @param {string} _event.deviceId - Current deviceId
+   * @param {string} _event.bundleId - Current bundleId
+   * @param {number} _event.pid - Process id of the running app
    * @return {Promise<void>} - when done
    */
-  async onAppReady(event) {
+  async onAppReady(_event) {
     Object.assign(this.context, {
       isAppReady: true,
     });
@@ -117,24 +117,24 @@ class ArtifactPlugin {
    *
    * @protected
    * @async
-   * @param {Object} event - App termination event object
-   * @param {string} event.deviceId - Current deviceId
-   * @param {string} event.bundleId - Current bundleId
+   * @param {Object} _event - App termination event object
+   * @param {string} _event.deviceId - Current deviceId
+   * @param {string} _event.bundleId - Current bundleId
    * @return {Promise<void>} - when done
    */
-  async onBeforeTerminateApp(event) {}
+  async onBeforeTerminateApp(_event) {}
 
   /**
    * Hook that is supposed to be called after app has been terminated
    *
    * @protected
    * @async
-   * @param {Object} event - App termination event object
-   * @param {string} event.deviceId - Current deviceId
-   * @param {string} event.bundleId - Terminated bundleId
+   * @param {Object} _event - App termination event object
+   * @param {string} _event.deviceId - Current deviceId
+   * @param {string} _event.bundleId - Terminated bundleId
    * @return {Promise<void>} - when done
    */
-  async onTerminateApp(event) {
+  async onTerminateApp(_event) {
     Object.assign(this.context, {
       bundleId: '',
       launchArgs: null,
@@ -148,34 +148,34 @@ class ArtifactPlugin {
    *
    * @protected
    * @async
-   * @param {Object} event - App uninstall event object
-   * @param {string} event.deviceId - Current deviceId
-   * @param {string} event.bundleId - Current bundleId
+   * @param {Object} _event - App uninstall event object
+   * @param {string} _event.deviceId - Current deviceId
+   * @param {string} _event.bundleId - Current bundleId
    * @return {Promise<void>} - when done
    */
-  async onBeforeUninstallApp(event) {}
+  async onBeforeUninstallApp(_event) {}
 
   /**
    * Hook that is supposed to be called before device.shutdown() happens
    *
    * @protected
    * @async
-   * @param {Object} event - Device shutdown event object
-   * @param {string} event.deviceId - Current deviceId
+   * @param {Object} _event - Device shutdown event object
+   * @param {string} _event.deviceId - Current deviceId
    * @return {Promise<void>} - when done
    */
-  async onBeforeShutdownDevice(event) {}
+  async onBeforeShutdownDevice(_event) {}
 
   /**
    * Hook that is supposed to be called from device.shutdown()
    *
    * @protected
    * @async
-   * @param {Object} event - Device shutdown event object
-   * @param {string} event.deviceId - Current deviceId
+   * @param {Object} _event - Device shutdown event object
+   * @param {string} _event.deviceId - Current deviceId
    * @return {Promise<void>} - when done
    */
-  async onShutdownDevice(event) {
+  async onShutdownDevice(_event) {
     Object.assign(this.context, {
       deviceId: '',
       bundleId: '',
@@ -191,12 +191,12 @@ class ArtifactPlugin {
    *
    * @protected
    * @async
-   * @param {Object} event - Information about an indirectly created artifact
-   * @param {string} event.name - Target name for the artifact
-   * @param {Artifact} event.artifact - Artifact instance
+   * @param {Object} _event - Information about an indirectly created artifact
+   * @param {string} _event.name - Target name for the artifact
+   * @param {Artifact} _event.artifact - Artifact instance
    * @return {Promise<void>} - when done
    */
-  async onCreateExternalArtifact(event) {}
+  async onCreateExternalArtifact(_event) {}
 
   /**
    * Hook that is called before a test begins
@@ -216,11 +216,12 @@ class ArtifactPlugin {
    *
    * @protected
    * @async
-   * @param {string} failureDetails.hook
-   * @param {*} failureDetails.error
+   * @param {object} _failureDetails
+   * @param {string} _failureDetails.hook
+   * @param {*} _failureDetails.error
    * @return {Promise<void>} - when done
    */
-  async onHookFailure(failureDetails) {
+  async onHookFailure(_failureDetails) {
     this._hasFailingTests = true;
   }
 
@@ -229,10 +230,11 @@ class ArtifactPlugin {
    *
    * @protected
    * @async
-   * @param {*} failureDetails.error
+   * @param {object} _failureDetails
+   * @param {*} _failureDetails.error
    * @return {Promise<void>} - when done
    */
-  async onTestFnFailure(failureDetails) {
+  async onTestFnFailure(_failureDetails) {
     this._hasFailingTests = true;
   }
 
@@ -267,10 +269,10 @@ class ArtifactPlugin {
    *
    * @protected
    * @async
-   * @param {Suite} suite - has name of currently running test suite
+   * @param {Suite} _suite - has name of currently running test suite
    * @return {Promise<void>} - when done
    */
-  async onRunDescribeFinish(suite) {
+  async onRunDescribeFinish(_suite) {
     this.context.suite = null;
   }
 

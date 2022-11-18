@@ -3,7 +3,7 @@ const DeviceAllocator = require('../DeviceAllocator');
 
 class DeviceAllocatorFactory {
   /**
-   * @param deps { Object }
+   * @param {*} deps
    * @returns { DeviceAllocator }
    */
   createDeviceAllocator(deps) {
@@ -12,11 +12,12 @@ class DeviceAllocatorFactory {
   }
 
   /**
-   * @param deps
+   * @param {*} _deps
    * @returns { AllocationDriverBase }
-   * @private
+   * @abstract
+   * @protected
    */
-  _createDriver(deps) {} // eslint-disable-line no-unused-vars
+  _createDriver(_deps) {}
 }
 
 module.exports = DeviceAllocatorFactory;

@@ -41,7 +41,7 @@ class AndroidEmulator extends RuntimeDriverFactoryAndroid {
 }
 
 class AndroidAttached extends RuntimeDriverFactoryAndroid {
-  _createDriver(deviceCookie, deps, configs) { // eslint-disable-line no-unused-vars
+  _createDriver(deviceCookie, deps, _configs) {
     const props = {
       adbName: deviceCookie.adbName,
     };
@@ -52,7 +52,7 @@ class AndroidAttached extends RuntimeDriverFactoryAndroid {
 }
 
 class Genycloud extends RuntimeDriverFactoryAndroid {
-  _createDriver(deviceCookie, deps, configs) { // eslint-disable-line no-unused-vars
+  _createDriver(deviceCookie, deps, _configs) {
     const props = {
       instance: deviceCookie.instance,
     };
